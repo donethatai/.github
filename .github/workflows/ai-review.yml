@@ -56,6 +56,7 @@ jobs:
       fallback: ${{ steps.gate.outputs.fallback }}
       reason: ${{ steps.gate.outputs.reason }}
       base: ${{ steps.gate.outputs.base }}
+      since: ${{ steps.gate.outputs.since }}
     steps:
       - id: gate
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -96,6 +97,7 @@ jobs:
                   { owner, repo, issue_number: number, per_page: 100 })).filter(e => e.event === 'base_ref_changed');
                 since = Math.max(pushed, ...baseChanges.map(e => Date.parse(e.created_at)));
                 seenUpdatedAt = pr.updated_at;
+                if (reviewStartedAt <= since) reviewStartedAt = undefined; // that review predates the retarget
               }
               base = pr.base.sha;
               const reviews = await github.paginate(github.rest.pulls.listReviews,
@@ -148,6 +150,7 @@ jobs:
                 core.setOutput('fallback', 'true');
                 core.setOutput('reason', result.reason);
                 core.setOutput('base', base);
+                core.setOutput('since', String(since));
                 return;
               }
               if (`${result.state}:${result.description}` !== last) {
@@ -240,6 +243,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      issues: read
       pull-requests: write
       statuses: write
     steps:
@@ -248,6 +252,7 @@ jobs:
           RESULT: ${{ needs.review.outputs.result }}
           REVIEW_OK: ${{ needs.review.result == 'success' }}
           REASON: ${{ needs.wait.outputs.reason }}
+          SINCE: ${{ needs.wait.outputs.since }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -261,6 +266,14 @@ jobs:
 
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (pr.state !== 'open' || pr.head.sha !== head) return core.info('The pull request moved on; a newer run reviews it.');
+            // Retargeting starts no run, so a review of the old base must not pass the new one.
+            const baseChanges = (await github.paginate(github.rest.issues.listEventsForTimeline,
+              { owner, repo, issue_number: number, per_page: 100 })).filter(e => e.event === 'base_ref_changed');
+            if (pr.base.ref !== pr.base.repo.default_branch
+                || baseChanges.some(e => Date.parse(e.created_at) > Number(process.env.SINCE))) {
+              await setStatus('pending', 'The pull request was retargeted during the review. Re-run this check.');
+              return core.warning('Retargeted during the API review; nothing posted.');
+            }
 
             let result;
             try { result = JSON.parse(process.env.RESULT); } catch { /* handled below */ }
