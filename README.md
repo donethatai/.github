@@ -37,6 +37,5 @@ covered repo picks up the change at once.
 
 | Repo | Shared gate |
 | --- | --- |
-| donethat-trust | pilot |
-| donethat-firebase, donethat-webapp, donethat-website, donethat-wxt, donethat-zapier | not yet |
+| donethat-trust, donethat-firebase, donethat-webapp, donethat-website, donethat-wxt, donethat-zapier | in the ruleset; local copies removed by their "Run the AI review gate from donethatai/.github" PRs |
 | donethat-n8n, donethat-electron (public) | not yet, see above |
