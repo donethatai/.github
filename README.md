@@ -40,3 +40,5 @@ covered repo picks up the change at once.
 | donethat-trust | pilot |
 | donethat-firebase, donethat-webapp, donethat-website, donethat-wxt, donethat-zapier | not yet |
 | donethat-n8n, donethat-electron (public) | not yet, see above |
+
+Test line for the fallback run; this pull request is closed unmerged.
