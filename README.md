@@ -19,8 +19,8 @@ until their conversations are resolved.
    donethatai organization". The ruleset can't run the workflow without it.
 2. Organization secret `OPENAI_API_KEY`, available to every repo the ruleset covers. Without
    it, the gate only waits for Codex on the plan, as before.
-3. Organization ruleset "AI review": target the default branch of the covered repos, rule
-   "Require workflows to pass before merging" with this repo,
+3. Organization ruleset "AI review" (id 25007847): target the default branch of the covered
+   repos, rule "Require workflows to pass before merging" with this repo,
    `.github/workflows/ai-review.yml`, pinned to a commit of `main`.
 4. In each covered repo: keep `AI review` in the required status checks, and delete the
    repo's own `.github/workflows/ai-review.yml`.
