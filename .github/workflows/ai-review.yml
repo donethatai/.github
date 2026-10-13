@@ -57,8 +57,8 @@ jobs:
           HAS_API_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
         with:
           script: |
-            const CODEX = 'chatgpt-codex-connector[bot]';
-            const START_MS = 5 * 60 * 1000;   // no 👀 by then: Codex isn't coming
+            const CODEX = 'test-no-such-bot[bot]'; // TEST ONLY: ignore Codex on the plan
+            const START_MS = 60 * 1000;   // no 👀 by then: Codex isn't coming
             const FINISH_MS = 20 * 60 * 1000; // 👀 but no result by then: Codex is stuck
             const { owner, repo } = context.repo;
             const number = context.payload.pull_request.number;
