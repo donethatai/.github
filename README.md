@@ -40,3 +40,28 @@ All repos in SOC 2 scope are in the ruleset: donethat-trust, donethat-firebase,
 donethat-webapp, donethat-website, donethat-wxt, donethat-zapier, donethat-n8n and
 donethat-electron. None keeps its own copy; donethat-trust's `scripts/check-shared-workflows.sh`
 lists any that does.
+
+## Secret scan
+
+`.github/workflows/secrets.yml` sets the required `secrets` status on every pull request in the
+private repos: gitleaks scans the pull request's commits without checking them out. The comment
+at the top of the file says how. Public repos use GitHub's own secret scanning instead.
+
+### Setup
+
+1. Organization ruleset "Secret scan": target the default branch of donethat-trust,
+   donethat-firebase, donethat-webapp, donethat-website, donethat-wxt and donethat-zapier,
+   rule "Require workflows to pass before merging" with this repo,
+   `.github/workflows/secrets.yml`, pinned to a commit of `main`.
+2. In each covered repo: keep `secrets` in the required status checks, and delete the repo's
+   own `.github/workflows/secrets.yml`. Exceptions stay in that repo's `.gitleaksignore`.
+
+### Changing the scan
+
+Change the file here through a pull request, then move the ruleset's pinned commit, as for the
+AI review gate.
+
+## Pull request template
+
+`.github/pull_request_template.md` is the default template for every repo in the organization
+that has none of its own, private repos included. Change it here; don't add copies to repos.
