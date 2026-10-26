@@ -170,7 +170,9 @@ jobs:
     concurrency:
       group: ai-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    # codex-action's drop-sudo fails on Ubuntu 26.04 (openai/codex-action#188). Back to
+    # ubuntu-latest once a release fixes it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
