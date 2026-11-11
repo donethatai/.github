@@ -12,7 +12,10 @@
 #      don't name a commit, so they don't count.
 #    - No findings: Codex shows 👀 while reviewing, then replaces it with 👍. A 👍 has no commit,
 #      so it only counts after this run saw a 👀 created after the push (or after the base
-#      branch changed). The run checks every 10 seconds, so a review is hard to miss.
+#      branch changed). The run checks every 10 seconds, but a fast review can come and go
+#      between checks, so Codex's summary comment counts too: its hidden review state names
+#      the commit, and only a completed review of this head with no findings, updated after
+#      the push (or base change), passes.
 #    Reactions don't trigger workflows, so the run started by each push polls.
 # 2. Codex CLI on the org API key (OPENAI_API_KEY, billed per token), when Codex on the plan
 #    says it reached its usage limit, or hasn't started 5 minutes into the run, or hasn't
@@ -82,6 +85,13 @@ jobs:
 
             // The commit a Codex review says it reviewed, e.g. "**Reviewed commit:** `66ac51fd30`".
             const reviewedCommit = body => (/Reviewed commit:\**\s*`([0-9a-f]{7,40})`/.exec(body || '') || [])[1];
+            // The review state Codex keeps in its summary comment, e.g.
+            // <!-- codex-review-state:v1 {"code_review":{"commit_sha":"…","status":"completed",…}} -->
+            const summaryState = body => {
+              const match = /codex-review-state:v1 (\{.*\}) -->/.exec(body || '');
+              if (!match) return null;
+              try { return JSON.parse(match[1]); } catch { return null; }
+            };
 
             async function evaluate() {
               const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
@@ -114,10 +124,17 @@ jobs:
                   && reactions.some(r => r.content === '+1' && Date.parse(r.created_at) > reviewStartedAt)) {
                 return { state: 'success', description: `Codex reviewed ${head.slice(0, 7)} with no findings.` };
               }
-              if (pr.draft) return { state: 'pending', description: 'Draft: once it is ready for review, re-run this check.' };
-
               const comments = await github.paginate(github.rest.issues.listComments,
                 { owner, repo, issue_number: number, since: new Date(since).toISOString(), per_page: 100 });
+              if (comments.some(c => {
+                if (c.user.login !== CODEX || Date.parse(c.updated_at) <= since) return false;
+                const review = summaryState(c.body)?.code_review;
+                return review?.commit_sha === head && review.status === 'completed' && review.has_any_findings === false;
+              })) {
+                return { state: 'success', description: `Codex reviewed ${head.slice(0, 7)} with no findings.` };
+              }
+              if (pr.draft) return { state: 'pending', description: 'Draft: once it is ready for review, re-run this check.' };
+
               let reason;
               if (comments.some(c => c.user.login === CODEX && Date.parse(c.created_at) > since
                   && /reached your Codex usage limits/i.test(c.body || ''))) {
