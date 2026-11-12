@@ -16,7 +16,8 @@
 #      between checks, so Codex's summary comment counts too: its hidden review state names
 #      the commit, and only a completed review of this head with no findings, updated after
 #      the push (or base change), passes.
-#    Reactions don't trigger workflows, so the run started by each push polls.
+#    Reactions don't trigger workflows, so the run started by each push polls. GitHub API
+#    requests are retried, and a server error while polling only means checking again later.
 # 2. Codex CLI on the org API key (OPENAI_API_KEY, billed per token), when Codex on the plan
 #    says it reached its usage limit, or hasn't started 5 minutes into the run, or hasn't
 #    finished after 20. It reviews the diff in a read-only sandbox, and the last job posts its
@@ -66,6 +67,7 @@ jobs:
         env:
           HAS_API_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
         with:
+          retries: 3
           script: |
             const CODEX = 'chatgpt-codex-connector[bot]';
             const START_MS = 5 * 60 * 1000;   // no 👀 by then: Codex isn't coming
@@ -159,8 +161,18 @@ jobs:
 
             const deadline = Date.now() + 22 * 60 * 1000;
             let last;
+            // GitHub server errors, rate limits and network failures. Anything else is a real problem.
+            const isTransient = error => !error.status || error.status === 429 || error.status >= 500;
             for (;;) {
-              const result = await evaluate();
+              let result;
+              try {
+                result = await evaluate();
+              } catch (error) {
+                if (!isTransient(error) || Date.now() > deadline) throw error;
+                core.warning(`GitHub API error (${error.status || error.message}); checking again in 10 seconds.`);
+                await sleep(10 * 1000);
+                continue;
+              }
               if (result.state === 'done') return core.info(result.description);
               if (result.state === 'fallback') {
                 await setStatus('pending', `${result.reason}. Reviewing with the org API key.`);
@@ -273,6 +285,7 @@ jobs:
           REASON: ${{ needs.wait.outputs.reason }}
           SINCE: ${{ needs.wait.outputs.since }}
         with:
+          retries: 3
           script: |
             const { owner, repo } = context.repo;
             const number = context.payload.pull_request.number;
